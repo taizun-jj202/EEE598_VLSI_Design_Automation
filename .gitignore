@@ -1,0 +1,8 @@
+
+# Ignore VS Code and Python version files.
+.DS_Store
+.python-version
+
+# Ignore python venv
+python_venv/
+CODE/PY_FILES/__pycache__
