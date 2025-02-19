@@ -79,11 +79,13 @@ import os
 import argparse
 from functions import *
 import time
+import contextlib
 
 # Command line argument parser section. 
 #   Supports the following commands :
 #       --read_ckt
 #       --slews
+#       --delays
 #       --read_nldm
 
 parser = argparse.ArgumentParser(
@@ -142,13 +144,22 @@ if args.read_ckt:
 if args.slews and args.read_nldm:
     NLDM_FILE_PATH = os.path.abspath(args.read_nldm)
     start = time.time()
-    print_nldm_output_slew_table(NLDM_FILE_PATH)
+    output_file = f"slew_LUT_{os.path.splitext(os.path.basename(NLDM_FILE_PATH))[0]}.txt"
+    with open(output_file, 'w') as f:
+        with contextlib.redirect_stdout(f):
+            print_nldm_output_slew_table(NLDM_FILE_PATH)
     end = time.time()
     print(f"\nExecution time for slew tables : {(end-start):.6f} seconds")
+    print(f"Output saved to {output_file}")
 
+# --delays and --read_nldm arguments.
 if args.delays and args.read_nldm:
     NLDM_FILE_PATH = os.path.abspath(args.read_nldm)
     start = time.time()
-    print_nldm_cell_delay_table(NLDM_FILE_PATH)
+    output_file = f"delay_LUT_{os.path.splitext(os.path.basename(NLDM_FILE_PATH))[0]}.txt"
+    with open(output_file, 'w') as f:
+        with contextlib.redirect_stdout(f):
+            print_nldm_cell_delay_table(NLDM_FILE_PATH)
     end = time.time()
     print(f"\nExecution time for delay tables: {(end-start):.6f} seconds")
+    print(f"Output saved to {output_file}")

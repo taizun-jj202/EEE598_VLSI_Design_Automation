@@ -163,17 +163,22 @@ This section contains functions that are used to parse given .lib(NLDM) file int
     print data about corresponding `slew` and `delay` values and give the following sample output :
 
 Parsing file using the --delays option should give the following output for all cells in the file:
->>> cell: NAND2_X1
-        input slews: 0.00117378,0.00472397,0.0171859,0.0409838,0.0780596,0.130081,0.198535
-        load cap: 0.365616,1.854900,3.709790,7.419590,14.839200,29.678300,59.356700
-        delays:
-        0.00743070,0.0112099,0.0157672,0.0247561,0.0426101,0.0782368,0.149445;
-        0.00896317,0.0127084,0.0173000,0.0263569,0.0442815,0.0799642,0.151206;
-        0.0141826,0.0189535,0.0236392,0.0325101,0.0503637,0.0860462,0.157306;
-        0.0198673,0.0266711,0.0336357,0.0448850,0.0628232,0.0981540,0.169220;
-        0.0262799,0.0348883,0.0438330,0.0586475,0.0818511,0.117889,0.188351;
-        0.0334985,0.0438815,0.0546771,0.0727012,0.101569,0.145562,0.216015;
-        0.0415987,0.0537162,0.0663517,0.0874425,0.121509,0.174517,0.253405;
+
+>>> python3.7 parser.py --slews --read_nldm sample_NLDM.lib 
+
+    Cell Name          : NAND2_X1
+    Cell Capacitance   : 1.599032
+    Input Slew         : [0.00117378 0.00472397 0.0171859  0.0409838  0.0780596  0.130081
+    0.198535  ]
+    Load Capacitance   : [ 0.365616  1.8549    3.70979   7.41959  14.8392   29.6783   59.3567  ]
+    Cell Delay Table    :
+        0.0074307,0.0112099,0.0157672,0.0247561,0.0426101,0.0782368,0.149445
+        0.00896317,0.0127084,0.0173,0.0263569,0.0442815,0.0799642,0.151206
+        0.0141826,0.0189535,0.0236392,0.0325101,0.0503637,0.0860462,0.157306
+        0.0198673,0.0266711,0.0336357,0.044885,0.0628232,0.098154,0.16922
+        0.0262799,0.0348883,0.043833,0.0586475,0.0818511,0.117889,0.188351
+        0.0334985,0.0438815,0.0546771,0.0727012,0.101569,0.145562,0.216015
+        0.0415987,0.0537162,0.0663517,0.0874425,0.121509,0.174517,0.253405
 
 Parsing file using the --slew option should produce the following output for all cells in the file:
 
@@ -245,6 +250,7 @@ def print_nldm_output_slew_table(NLDM_FILE:str):
             lut.ost_load_capacitance = index_2_values    # Index-2 values in output_slew() sub-section of a cell
             lut.output_slew_table = output_slew_table    # Output slew table as a 2D numpy array
 
+            print('\n')
             print(f'Cell Name          : {lut.cell_name}')
             print(f'Cell Capacitance   : {lut.capacitance}')
             print(f'Input Slew         : {lut.ost_input_slews}')
