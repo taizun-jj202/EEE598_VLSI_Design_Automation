@@ -1,0 +1,8 @@
+# Runtime averaged over 10 runs
+Input File		Average Time (seconds)
+========================================
+b19_C.bench		2.568811
+c7552.bench		0.150611
+c17.bench		0.121530
+b15.bench		0.188295
+b17_C.bench		0.418743
