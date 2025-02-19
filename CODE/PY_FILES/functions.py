@@ -28,6 +28,7 @@ the section for .bench files does not have documentation as of now
 
 
 from tabulate import tabulate
+import contextlib
 
 
 # Define data structure to store details of each node in bench
@@ -103,7 +104,7 @@ def set_nodes(CIRCUIT_BENCH_FILE):
 
 
 # Function to print all nodes in required format :
-def print_output_info():
+def print_output_info(file=None):
     # Count the different types and number of gates
     gate_counts = {}
     for node in nodes.values():
@@ -120,32 +121,34 @@ def print_output_info():
     for gate_type, count in gate_counts.items():
         table_data.append([f"{gate_type} gates", count])
 
-    # Print the table
-    print(tabulate(table_data, headers=["Type", "Count"], tablefmt="grid"))
+    # Redirect output to file if provided
+    with contextlib.redirect_stdout(file) if file else contextlib.nullcontext():
+        # Print the table
+        print(tabulate(table_data, headers=["Type", "Count"], tablefmt="grid"))
 
-    # Print Fanout :
-    # Example Output: e.g -- NAND-16 : NAND-22, NAND-19
-    print("\n")
-    print('-' * 70)
-    print("\t \t FAN-OUT")
-    print('-' * 70)
-    for node in nodes.values():
-        if node.gate_type != "INPUT" and node.outputs:  # Exclude primary inputs from fan-out section
-            output_names = [f"{out_node.gate_type}-{out_node.name}" for out_node in node.outputs]
-            print(f"{node.gate_type}-{node.name}: {', '.join(output_names)}")
-        elif node.gate_type != "INPUT":
-            print(f"{node.gate_type}-{node.name}: OUTPUT-{node.name}")
+        # Print Fanout :
+        # Example Output: e.g -- NAND-16 : NAND-22, NAND-19
+        print("\n")
+        print('-' * 70)
+        print("\t \t FAN-OUT")
+        print('-' * 70)
+        for node in nodes.values():
+            if node.gate_type != "INPUT" and node.outputs:  # Exclude primary inputs from fan-out section
+                output_names = [f"{out_node.gate_type}-{out_node.name}" for out_node in node.outputs]
+                print(f"{node.gate_type}-{node.name}: {', '.join(output_names)}")
+            elif node.gate_type != "INPUT":
+                print(f"{node.gate_type}-{node.name}: OUTPUT-{node.name}")
 
-    # print("\n")
-    print('-' * 70)
-    print("\t \t FAN-IN")
-    print('-' * 70)
-    for node in nodes.values():
-        if node.gate_type != "INPUT" and node.inputs:
-            input_names = [f"INPUT-{inp_node.name}" if inp_node.gate_type == "-" else f"{inp_node.gate_type}-{inp_node.name}" for inp_node in node.inputs]
-            print(f"{node.gate_type}-{node.name} : {', '.join(input_names)}")
-        elif node.gate_type != "INPUT":
-            print(f"{node.gate_type}-{node.name} : INPUT-{node.name}")
+        # print("\n")
+        print('-' * 70)
+        print("\t \t FAN-IN")
+        print('-' * 70)
+        for node in nodes.values():
+            if node.gate_type != "INPUT" and node.inputs:
+                input_names = [f"INPUT-{inp_node.name}" if inp_node.gate_type == "-" else f"{inp_node.gate_type}-{inp_node.name}" for inp_node in node.inputs]
+                print(f"{node.gate_type}-{node.name} : {', '.join(input_names)}")
+            elif node.gate_type != "INPUT":
+                print(f"{node.gate_type}-{node.name} : INPUT-{node.name}")
 
 
 ####################################################################################
@@ -160,22 +163,17 @@ This section contains functions that are used to parse given .lib(NLDM) file int
     print data about corresponding `slew` and `delay` values and give the following sample output :
 
 Parsing file using the --delays option should give the following output for all cells in the file:
-
->>> python3.7 parser.py --delays --read_nldm sample_NLDM.lib   
-
-    Cell Name          : NAND2_X1
-    Cell Capacitance   : 1.599032
-    Input Slew         : [0.00117378 0.00472397 0.0171859  0.0409838  0.0780596  0.130081
-    0.198535  ]
-    Load Capacitance   : [ 0.365616  1.8549    3.70979   7.41959  14.8392   29.6783   59.3567  ]
-    Cell Delay Table    :
-        0.0074307,0.0112099,0.0157672,0.0247561,0.0426101,0.0782368,0.149445
-        0.00896317,0.0127084,0.0173,0.0263569,0.0442815,0.0799642,0.151206
-        0.0141826,0.0189535,0.0236392,0.0325101,0.0503637,0.0860462,0.157306
-        0.0198673,0.0266711,0.0336357,0.044885,0.0628232,0.098154,0.16922
-        0.0262799,0.0348883,0.043833,0.0586475,0.0818511,0.117889,0.188351
-        0.0334985,0.0438815,0.0546771,0.0727012,0.101569,0.145562,0.216015
-        0.0415987,0.0537162,0.0663517,0.0874425,0.121509,0.174517,0.253405
+>>> cell: NAND2_X1
+        input slews: 0.00117378,0.00472397,0.0171859,0.0409838,0.0780596,0.130081,0.198535
+        load cap: 0.365616,1.854900,3.709790,7.419590,14.839200,29.678300,59.356700
+        delays:
+        0.00743070,0.0112099,0.0157672,0.0247561,0.0426101,0.0782368,0.149445;
+        0.00896317,0.0127084,0.0173000,0.0263569,0.0442815,0.0799642,0.151206;
+        0.0141826,0.0189535,0.0236392,0.0325101,0.0503637,0.0860462,0.157306;
+        0.0198673,0.0266711,0.0336357,0.0448850,0.0628232,0.0981540,0.169220;
+        0.0262799,0.0348883,0.0438330,0.0586475,0.0818511,0.117889,0.188351;
+        0.0334985,0.0438815,0.0546771,0.0727012,0.101569,0.145562,0.216015;
+        0.0415987,0.0537162,0.0663517,0.0874425,0.121509,0.174517,0.253405;
 
 Parsing file using the --slew option should produce the following output for all cells in the file:
 

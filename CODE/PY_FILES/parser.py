@@ -132,8 +132,11 @@ if args.read_ckt:
     create_nodes(BENCH_FILE_PATH)
     set_nodes(BENCH_FILE_PATH)
     end = time.time()
-    print_output_info()
+    output_file = f"ckt_details_{os.path.splitext(os.path.basename(BENCH_FILE_PATH))[0]}.txt"
+    with open(output_file, 'w') as f:
+        print_output_info(f)
     print(f"\nExecution time for .bench parsing : {(end-start):.6f} seconds")
+    print(f"Output saved to {output_file}")
 
 # --slews and --read_nldm arguments.
 if args.slews and args.read_nldm:
