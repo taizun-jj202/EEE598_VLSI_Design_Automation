@@ -50,7 +50,7 @@ Ensure `parser.py` and `functions.py` are in the same directory.
 If both files are in the same directory, you may now run the parser using the commands below. 
 Outputs here are show for `c17.bench` file and `sample_NLDM.lib` files respectively
 
-**NOTE** : parser will save a text file containing the result, and if file cannot be created, parser will print the output to the console.
+#### **NOTE** : parser will save a text file containing the result, and if file cannot be created, parser will print the output to the console.
 
 `parser.py` can be used to :
 1. Extract(parse) data from `.bench` files using the following command :
