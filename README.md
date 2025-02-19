@@ -21,7 +21,8 @@ Here `parser.py` is the main file. `parser.py` and `functions.py` must be in the
 
 **`NOTE`** : 
 - This parser has been developed with `python3.7`. Please ensure python version 3.7 is installed on the system before running the parser file.
-- I have also noted that the first time this program is run on EECAD servers, it takes much longer to run. Results after second run are consistent. So to get an accurate time estimate, please measure times only after second run
+- `parser.py` will create a text file containing the required result as well as print out the runtime of the program. 
+    - For e.g, if we parse `c17.bench` file using `python3.7 parser.py --read_ckt c17.bench`, then there will be a output text file named `ckt_details_c17.txt`
 
 ### Setup python venv 
 
@@ -48,6 +49,8 @@ The parser can be used with the following command line arguments :
 Ensure `parser.py` and `functions.py` are in the same directory. 
 If both files are in the same directory, you may now run the parser using the commands below. 
 Outputs here are show for `c17.bench` file and `sample_NLDM.lib` files respectively
+
+**NOTE** : parser will save a text file containing the result, and if file cannot be created, parser will print the output to the console.
 
 `parser.py` can be used to :
 1. Extract(parse) data from `.bench` files using the following command :
