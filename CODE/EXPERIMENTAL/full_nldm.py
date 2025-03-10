@@ -132,67 +132,14 @@ class Node:
         else:
             self.Cload = total_capacitance
 
-    # def Output_arrival_time_op_slew_time(self):
-    #     """
-    #     Calculates a_out and tau_out values for each node and assigns
-    #         them to all fan_outs from current ndoe.
 
-    #     a_out of current node serves as a_in(arrival_time) for fan_outs of current ndoe
-    #     tau_out of current node servers as t_in(input_slew) for fan_outs of current node.
-        
-        
-    #     a_out is maximum value of all input_arrival_times * input_slews
-    #     a_out = max( a[i] + d[i] ),      d[i] = interpolate_table (delay_table, 
-    #                                                                tau_[i] from list of input slew,
-    #                                                                Cload of that node)
-
-    #     Output slew time is taken as the argmax of all input_slews.
-    #     """
-    #     if self.gate_type != "INPUT":
-    #         gate_type_to_lut_name = {
-    #             'NAND' : 'NAND2_X1',
-    #             'NOR'  : 'NOR2_X1',
-    #             'AND'  : 'AND2_X1',
-    #             'OR'   : 'OR2_X1',
-    #             'XOR'  : 'XOR2_X1',
-    #             'INV'  : 'INV_X1',
-    #             'BUF'  : 'BUF_X1'
-    #         }
-
-    #         # # Debugging print statement
-    #         # print(f"Calculating Output_arrival_time for node: {self.name}, gate_type: {self.gate_type}")
-
-    #         lut_key = gate_type_to_lut_name[self.gate_type]
-
-    #         self._cell_delay = [
-    #             LUT_nodes_set[lut_key].interpolate_table(LUT_nodes_set[lut_key].delay_table, self.input_slew[i], self.Cload)
-    #             for i in range(len(self.input_slew))
-    #         ]
-
-    #         self.a_out = max([self.arrival_time[i] + self._cell_delay[i] for i in range(len(self.arrival_time))])
-    #         self.cell_delay = self.a_out
-    #         # Calculating output slew time for current node.
-    #         max_index = np.argmax(self.input_slew)
-    #         self.t_out_max_index = max_index  # Keeping track of highest index of input_slew list to get crtitical path.
-    #         self.t_out = self.input_slew[max_index]
-
-    #         # Input arrival_time of gates attached to current gate is a_out.
-    #         #   So we assign this a_out value to input_arrival_time of all fan_outs
-    #         #   Also we assign input_slew(tau_in) values to all fan_outs
-    #         for i, fan_out_node in enumerate(self.fan_outs):
-    #             if i >= len(fan_out_node.arrival_time) or fan_out_node.arrival_time[i] is None:
-    #                 fan_out_node.arrival_time[i] = self.a_out
-    #             if i >= len(fan_out_node.input_slew) or fan_out_node.input_slew[i] is None:
-    #                 fan_out_node.input_slew[i] = self.t_out
-    #         # Debugging print statement to verify a_out is updated
-    #         print(f"Node {self.name}, a_out updated to: {self.a_out}, tau_out updated to: {self.t_out}")
-
-      
+# Global variables      
 # Store nodes, input lines, and output lines
 nodes        = {}
 inputs_list  = []
 outputs_list = []
 
+circuit_delay = 0.0
 
 
 
@@ -337,8 +284,10 @@ def set_load_capacitance(nodes_set):
 
 
 
+# Computes the output arrival time and output slew for each node.
+# Uses DAG traversal algorithm.
 
-def compute_timing(graph):
+def Compute_timing(graph):
     # Compute in-degree (number of fan-ins for each node)
     in_degree = {node.name: len(node.fan_ins) for node in graph.values()}
 
@@ -401,6 +350,25 @@ def compute_timing(graph):
 
 
 
+def Compute_req_arrival_time(nodes):
+    """
+    Required arrival time is 1.1 * max circuit delay.
+
+    Max Delay is expected at Output pins only.
+    So to reduce computations and remove unnecessary computations,
+    we only calculate req arrival time using arrival time at OUTPUT nodes.
+    """
+
+    max_delay = 0 
+    for node in outputs_list:
+        if node.a_out > max_delay:
+            max_delay = node.a_out
+    circuit_delay = 1.1 * max_delay
+
+    # print(f"Max delay in circuit is : {max_delay}")
+    print(f"Circuit Delay : {circuit_delay * 1000} ps")
+
+
 ########################################################################################################################################################################
 
 #     MINI - PROJECT PHASE-2 CODE AND PROGRAM 
@@ -416,6 +384,7 @@ get_nldm_data(NLDM)
 get_bench_nodes(C17_BENCH)
 set_load_capacitance(nodes)
 # calc_aout(outputs_list)
-compute_timing(nodes)
+Compute_timing(nodes)
+Compute_req_arrival_time(outputs_list)
 
 print()
