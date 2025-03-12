@@ -14,7 +14,7 @@ if DEBUG:
 
 
 LUT_nodes_set = {}
-
+CHECK_NODE = 'U14535'
 # Define class LUT as mentioned in ProjectDescription.pdf file.
 class LUT : 
     
@@ -45,7 +45,7 @@ class LUT :
         """
         
         if self.ost_load_capacitance is None or self.ost_input_slews is None:
-            raise ValueError("ost_load_capacitance or ost_input_slews is None")
+            raise ValueError("ost_load_capacitance or self.ost_input_slews is None")
 
         # Finding the indices for the given slew and capacitance
         row_1 = np.searchsorted(self.ost_load_capacitance, capacitance) - 1
@@ -57,18 +57,33 @@ class LUT :
         # Getting the bounding values
         C_1, C_2 = self.ost_load_capacitance[row_1], self.ost_load_capacitance[row_2]
         tau_1, tau_2 = self.ost_input_slews[col_1], self.ost_input_slews[col_2]
-        v11, v12 = table[row_1, col_1], table[row_1, col_2]
-        v21, v22 = table[row_2, col_1], table[row_2, col_2]
-        # v11, v12 = table[row_1, col_1], table[col_2, row_1]
-        # v21, v22 = table[col_1, row_2], table[row_2, col_2]
+        # v11, v12 = table[row_1, col_1], table[row_1, col_2]
+        # v21, v22 = table[row_2, col_1], table[row_2, col_2]
+        v11, v12 = table[row_1, col_1], table[col_2, row_1]
+        v21, v22 = table[col_1, row_2], table[row_2, col_2]
 
-        # Perform bilinear interpolation
-        v = ((v11 * (C_2 - capacitance) * (tau_2 - slew) +
-             v12 * (capacitance - C_1) * (tau_2 - slew) +
-             v21 * (C_2 - capacitance) * (slew - tau_1) +
-             v22 * (capacitance - C_1) * (slew - tau_1)) / ((C_2 - C_1) * (tau_2 - tau_1)))
+        # If slew values become same, then change above formula accordingly :
+        if tau_1 == tau_2:
+            v = ((v11 * (C_2 - capacitance) * (tau_2 - slew) +
+                  v12 * (capacitance - C_1) * (tau_2 - slew) +
+                  v21 * (C_2 - capacitance) * (slew - tau_1) +
+                  v22 * (capacitance - C_1) * (slew - tau_1)) / ((C_2 - C_1) * (tau_2)))
+        
+        elif C_1 == C_2:
+            v = ((v11 * (C_2 - capacitance) * (tau_2 - slew) +
+                  v12 * (capacitance - C_1) * (tau_2 - slew) +
+                  v21 * (C_2 - capacitance) * (slew - tau_1) +
+                  v22 * (capacitance - C_1) * (slew - tau_1)) / ((C_2) * (tau_2 - tau_1)))
+
+        else: 
+            # Perform bilinear interpolation
+            v = ((v11 * (C_2 - capacitance) * (tau_2 - slew) +
+                v12 * (capacitance - C_1) * (tau_2 - slew) +
+                v21 * (C_2 - capacitance) * (slew - tau_1) +
+                v22 * (capacitance - C_1) * (slew - tau_1)) / ((C_2 - C_1) * (tau_2 - tau_1)))
         
         if np.isnan(v):
+            debugpy.breakpoint()
             print(f"Interpolation result is nan for slew={slew}, capacitance={capacitance}")
         
         return v
@@ -78,26 +93,29 @@ class LUT :
 #  structure to store details of each node in bench
 class Node:
     def __init__(self):
-        self.name = ""
+        self.name      = ""
         self.gate_type = ""
-        self.outname = ""
-        self.Cload = 0.0
-        self.fan_ins = []  # List of instances that fan-in to this node
-        self.fan_outs = [] # List of instances that fan-out from this node
+        self.outname   = ""
+        self.Cload     = 0.0
+        self.fan_ins   = []  # List of instances that fan-in to this node
+        self.fan_outs  = []  # List of instances that fan-out from this node
         
         # Every pin of a gate(node) will have the following attributes
-          # arrival_time, input_slew will have the the same 
-          # lenght as each input pin to gate will have these two attributes 
-        self.arrival_time = [] # Arrival time at input pins
-        self.input_slew = []   # Input slew at input pins
-        self.cell_delay = None   # Cell delay is a function of INPUT_SLEW and LOAD_CAPACITANCE
-                               #    Each pin will have its own cell delay, hence we store it as a list
-                               #    Cell_delay has same dimensions as ARRIVAL_TIME and INPUT_SLEW
-        self._cell_delay = []  # List of INPUT_SLEW * LOAD_CAPACITANCE. cell_delay is max value of this list.
+        # arrival_time, input_slew will have the the same 
+        # length as each input pin to gate will have these two attributes 
+        self.arrival_time  = []  # Arrival time at input pins
+        self.input_slew    = []  # Input slew at input pins
+        self.cell_delay    = None  # Cell delay is a function of INPUT_SLEW and LOAD_CAPACITANCE
+                                   # Each pin will have its own cell delay, hence we store it as a list
+                                   # Cell_delay has same dimensions as ARRIVAL_TIME and INPUT_SLEW
+        self._cell_delay   = []  # List of INPUT_SLEW * LOAD_CAPACITANCE. cell_delay is max value of this list.
         
-        self.a_out = None # Output arrival time.
-        self.t_out = None # Output slew time.
-        self.t_out_max_index = None # Index of maximum value in t_out list.
+        self.a_out              = None # Output arrival time.
+        self._a_out             = None # List of output arrival time for each input pin.    
+        self.t_out              = None # Output slew time.
+        self.t_out_max_index    = None # Index of maximum value in t_out list.
+        self.slack              = None # Slack = Ckt_Delay - a_out. Ckt_Delay is max_delay * 1.1
+        self.required_time      = None # Required Time used to calculate slack
 
     def Cload_calculations(self):
         """ 
@@ -119,6 +137,7 @@ class Node:
             'OR'   : 'OR2_X1',
             'XOR'  : 'XOR2_X1',
             'INV'  : 'INV_X1',
+            'NOT'  : 'INV_X1',
             'BUF'  : 'BUF_X1'
         }
         
@@ -126,10 +145,7 @@ class Node:
         for fan_out_node in self.fan_outs:
             lut_key = gate_type_to_lut_name[fan_out_node.gate_type]
             total_capacitance += float(LUT_nodes_set[lut_key].capacitance)
-        
-        if len(self.fan_outs) > 2:
-            self.Cload = total_capacitance * (len(self.fan_outs) / 2)
-        else:
+    
             self.Cload = total_capacitance
 
 
@@ -283,11 +299,18 @@ def set_load_capacitance(nodes_set):
             outputs_list[i] = nodes[output_node.name]
 
 
+def set_load_capacitance_for_node(node_name):
+    debugpy.breakpoint()  # Add a breakpoint here
+    node = nodes[node_name]
+    node.Cload_calculations()
+    print(f"Load capacitance for node {node_name} is set to {node.Cload}")
+    
+
 
 # Computes the output arrival time and output slew for each node.
 # Uses DAG traversal algorithm.
 
-def Compute_timing(graph):
+def Compute_arrival_timing(graph):
     # Compute in-degree (number of fan-ins for each node)
     in_degree = {node.name: len(node.fan_ins) for node in graph.values()}
 
@@ -298,6 +321,9 @@ def Compute_timing(graph):
         node_name = queue.popleft()
         node = graph[node_name]
 
+        # if node.name == CHECK_NODE:
+        #     debugpy.breakpoint()
+
         if node.gate_type == "INPUT":
             # INPUT nodes have fixed values
             node.a_out = 0 
@@ -305,14 +331,15 @@ def Compute_timing(graph):
         else:
             # Compute output arrival time (a_out)
             gate_type_to_lut_name = {
-                'NAND': 'NAND2_X1',
-                'NOR': 'NOR2_X1',
-                'AND': 'AND2_X1',
-                'OR': 'OR2_X1',
-                'XOR': 'XOR2_X1',
-                'INV': 'INV_X1',
-                'BUF': 'BUF_X1'
-            }
+            'NAND' : 'NAND2_X1',
+            'NOR'  : 'NOR2_X1',
+            'AND'  : 'AND2_X1',
+            'OR'   : 'OR2_X1',
+            'XOR'  : 'XOR2_X1',
+            'INV'  : 'INV_X1',
+            'NOT'  : 'INV_X1',
+            'BUF'  : 'BUF_X1'
+        }
             gate_type = node.gate_type
             lut_key = gate_type_to_lut_name[gate_type]
             lut = LUT_nodes_set[lut_key]
@@ -322,21 +349,16 @@ def Compute_timing(graph):
                 for i in range(len(node.input_slew))
             ]
 
-            node.a_out = max(node.arrival_time[i] + node._cell_delay[i]
-                             for i in range(len(node.arrival_time)))
+            node._a_out = [node.arrival_time[i] + node._cell_delay[i] for i in range(len(node.arrival_time))]
+            node.a_out = max(node._a_out)
 
-            # # Compute output slew time (tau_out)
-            # max_index = np.argmax(node.input_slew)
-            # node.t_out = lut.interpolate_table(lut.output_slew_table,
-            #                                    node.input_slew[max_index],
-            #                                    node.Cload)
-            
             _t_out = [
                 lut.interpolate_table(lut.output_slew_table, node.input_slew[i], node.Cload)
                 for i in range(len(node.input_slew))
             ]
-            max_index = np.argmax(_t_out)
-            node.t_out = _t_out[max_index]
+            # max_index = np.argmax(_t_out)
+            # node.t_out = _t_out[max_index]
+            node.t_out = max(_t_out)
 
         # Propagate to fan-out nodes
         for fan_out in node.fan_outs:
@@ -350,23 +372,82 @@ def Compute_timing(graph):
 
 
 
-def Compute_req_arrival_time(nodes):
-    """
-    Required arrival time is 1.1 * max circuit delay.
-
-    Max Delay is expected at Output pins only.
-    So to reduce computations and remove unnecessary computations,
-    we only calculate req arrival time using arrival time at OUTPUT nodes.
-    """
-
+def Compute_Required_Time(nodes, circuit_delay):
     max_delay = 0 
     for node in outputs_list:
         if node.a_out > max_delay:
             max_delay = node.a_out
+
     circuit_delay = 1.1 * max_delay
 
-    # print(f"Max delay in circuit is : {max_delay}")
-    print(f"Circuit Delay : {circuit_delay * 1000} ps")
+    for node in outputs_list:
+        node.required_time = circuit_delay
+
+    # Initialize in-degree (number of fan-outs for each node)
+    in_degree = {node.name: len(node.fan_outs) for node in nodes.values()}
+
+    # Initialize queue with OUTPUT gates (in-degree = 0)
+    queue = deque([node.name for node in outputs_list])
+
+    while queue:
+        node_name = queue.popleft()
+        node = nodes[node_name]
+
+        if node.gate_type != "OUTPUT":
+            if node.fan_outs:
+                node.required_time = min(
+                    [fan_out.required_time - fan_out._cell_delay[fan_out.fan_ins.index(node)] for fan_out in node.fan_outs]
+                )
+            else:
+                node.required_time = circuit_delay  
+
+        # Propagate to fan-in nodes
+        for fan_in in node.fan_ins:
+            in_degree[fan_in.name] -= 1
+
+            # If all fan-outs are processed, add to queue
+            if in_degree[fan_in.name] == 0:
+                queue.append(fan_in.name)
+
+    for node in nodes.values():
+        node.slack = node.required_time - node.a_out
+
+def find_critical_path(output_list):
+    # Find the primary output with the minimum slack
+    min_slack_output = min(output_list, key=lambda node: node.slack)
+    critical_path = [min_slack_output]
+
+    current_node = min_slack_output
+    while current_node.gate_type != "INPUT":
+        # Find the fan-in with the minimum slack
+        min_slack_fan_in = min(current_node.fan_ins, key=lambda node: node.slack)
+        critical_path.append(min_slack_fan_in)
+        current_node = min_slack_fan_in
+
+    # Reverse the path to start from the primary input
+    critical_path.reverse()
+
+    print("Critical Path:")
+    for node in critical_path:
+        print(f"{node.gate_type}-{node.name}")
+
+
+def check_CLOAD(nodes, FILE=None):
+    for node in nodes.values():
+        # if (node.Cload > 59.356700):
+        #     print(f"{node.name} : {node.Cload}", file=FILE)
+        if (node.name == 'READY_N' or node.name == 'U9307' or node.name == 'U13141'):
+            print(f"{node.name}----------------------------------", file=FILE)
+            for fan_out in node.fan_outs:
+                print(f"{fan_out.name} : {fan_out.Cload}", file=FILE)
+
+
+
+# ###################### DEBUG functions :
+def check_nodes(node_name):
+    node = nodes[node_name]
+    set_load_capacitance(node)
+    print()
 
 
 ########################################################################################################################################################################
@@ -376,15 +457,23 @@ def Compute_req_arrival_time(nodes):
 ########################################################################################################################################################################
 
 NLDM = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/sample_NLDM.lib"
-C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/c17.bench"
-# C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/b15.bench"
+# C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/c17.bench"
+C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/b15.bench"
+FILE = open('VALUES.txt', 'w')
 
 #  Fills all Node() and LUT() class objects with data.
 get_nldm_data(NLDM)
 get_bench_nodes(C17_BENCH)
 set_load_capacitance(nodes)
-# calc_aout(outputs_list)
-Compute_timing(nodes)
-Compute_req_arrival_time(outputs_list)
+# set_load_capacitance_for_node('U9307')
 
-print()
+Compute_arrival_timing(nodes)
+Compute_Required_Time(nodes, circuit_delay)
+
+for node in nodes.values():
+    print(f"{node.gate_type}-{node.name} Slack = {node.slack * 1000}", file=FILE)
+
+find_critical_path(outputs_list)
+
+
+print("\n")
