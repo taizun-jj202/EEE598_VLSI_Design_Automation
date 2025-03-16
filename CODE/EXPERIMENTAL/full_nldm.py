@@ -2,7 +2,7 @@ import numpy as np
 import re
 from collections import deque
 
-DEBUG = 1
+DEBUG = 0
 
 if DEBUG:
     import debugpy
@@ -154,7 +154,6 @@ class Node:
 nodes        = {}
 inputs_list  = []
 outputs_list = []
-
 circuit_delay = 0.0
 
 
@@ -309,7 +308,6 @@ def set_load_capacitance_for_node(node_name):
 
 # Computes the output arrival time and output slew for each node.
 # Uses DAG traversal algorithm.
-
 def Compute_arrival_timing(graph):
     # Compute in-degree (number of fan-ins for each node)
     in_degree = {node.name: len(node.fan_ins) for node in graph.values()}
@@ -327,7 +325,8 @@ def Compute_arrival_timing(graph):
         if node.gate_type == "INPUT":
             # INPUT nodes have fixed values
             node.a_out = 0 
-            node.t_out = 0.002  
+            node.t_out = 0.002
+            node._cell_delay = [0 for _ in range(len(node.fan_outs) + 1)] 
         else:
             # Compute output arrival time (a_out)
             gate_type_to_lut_name = {
@@ -372,7 +371,7 @@ def Compute_arrival_timing(graph):
 
 
 
-def Compute_Required_Time(nodes, circuit_delay):
+def Compute_Required_Time(nodes, file=None):
     max_delay = 0 
     for node in outputs_list:
         if node.a_out > max_delay:
@@ -394,10 +393,23 @@ def Compute_Required_Time(nodes, circuit_delay):
         node = nodes[node_name]
 
         if node.gate_type != "OUTPUT":
-            if node.fan_outs:
+            
+            # Check added because _cell_delay does not exist for INPUT pins.
+            # So required time of INPUT is simply the min of its fan_outs.
+            # Check if the node is both INPUT and OUTPUT
+            if node.gate_type == "INPUT" and node in outputs_list:
+                node.required_time = circuit_delay
+            
+            elif node.gate_type == "INPUT":
                 node.required_time = min(
-                    [fan_out.required_time - fan_out._cell_delay[fan_out.fan_ins.index(node)] for fan_out in node.fan_outs]
+                    [fan_out.required_time - (fan_out._cell_delay[fan_out.fan_ins.index(node)] if fan_out._cell_delay else 0) for fan_out in node.fan_outs]
                 )
+            
+            elif node.fan_outs:
+                node.required_time = min(
+                    [fan_out.required_time - (fan_out._cell_delay[fan_out.fan_ins.index(node)] if fan_out._cell_delay else 0) for fan_out in node.fan_outs]
+                )
+
             else:
                 node.required_time = circuit_delay  
 
@@ -432,23 +444,6 @@ def find_critical_path(output_list):
         print(f"{node.gate_type}-{node.name}")
 
 
-def check_CLOAD(nodes, FILE=None):
-    for node in nodes.values():
-        # if (node.Cload > 59.356700):
-        #     print(f"{node.name} : {node.Cload}", file=FILE)
-        if (node.name == 'READY_N' or node.name == 'U9307' or node.name == 'U13141'):
-            print(f"{node.name}----------------------------------", file=FILE)
-            for fan_out in node.fan_outs:
-                print(f"{fan_out.name} : {fan_out.Cload}", file=FILE)
-
-
-
-# ###################### DEBUG functions :
-def check_nodes(node_name):
-    node = nodes[node_name]
-    set_load_capacitance(node)
-    print()
-
 
 ########################################################################################################################################################################
 
@@ -457,8 +452,8 @@ def check_nodes(node_name):
 ########################################################################################################################################################################
 
 NLDM = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/sample_NLDM.lib"
-# C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/c17.bench"
-C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/b15.bench"
+C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/c17.bench"
+# C17_BENCH = "/Users/taizunj/Documents/Masters_2024/ASU/Student_Docs/SEM2/EEE598_VLSI_Design_Automation/Mini_Project/CODE/TEST_FILES/b15.bench"
 FILE = open('VALUES.txt', 'w')
 
 #  Fills all Node() and LUT() class objects with data.
@@ -468,12 +463,11 @@ set_load_capacitance(nodes)
 # set_load_capacitance_for_node('U9307')
 
 Compute_arrival_timing(nodes)
-Compute_Required_Time(nodes, circuit_delay)
+Compute_Required_Time(nodes)
+find_critical_path(outputs_list)
 
 for node in nodes.values():
-    print(f"{node.gate_type}-{node.name} Slack = {node.slack * 1000}", file=FILE)
-
-find_critical_path(outputs_list)
+    print(f"{node.gate_type}-{node.name} : {node.slack * 1000} ps", file=FILE)
 
 
 print("\n")
